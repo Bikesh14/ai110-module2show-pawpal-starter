@@ -35,8 +35,9 @@ No structural classes changed yet — these are refinements I'll make when I mov
 
 **a. Constraints and priorities**
 
-- What constraints does your scheduler consider (for example: time, priority, preferences)?
-- How did you decide which constraints mattered most?
+`Scheduler.build_plan()` considers three constraints, in this order: (1) a task's `fixed_time`, if it has one — fixed-time tasks are placed first and never reordered by priority; (2) `priority` (`high` > `medium` > `low`) for everything without a fixed time; and (3) `available_minutes` — the running time budget, which causes a task to be skipped entirely if it no longer fits, rather than being scheduled anyway.
+
+Fixed time was given the highest precedence because it represents a real-world commitment (a vet appointment, a dog walker's arrival) that the owner can't renegotiate, whereas priority is a preference the scheduler is free to use for the tasks that are actually flexible. Time budget comes last as a hard constraint/cutoff rather than an ordering signal — it doesn't change the order tasks are considered in, it just decides whether a task makes it into the plan at all.
 
 **b. Tradeoffs**
 
@@ -50,13 +51,11 @@ This tradeoff is reasonable for a small pet-care scheduler: task counts per pet 
 
 **a. How you used AI**
 
-- How did you use AI tools during this project (for example: design brainstorming, debugging, refactoring)?
-- What kinds of prompts or questions were most helpful?
+AI was used across the whole build, phase by phase: brainstorming the initial class list and UML from the README scenario, scaffolding dataclass skeletons before any logic existed, implementing the actual scheduling/sorting/filtering/conflict/recurrence algorithms, wiring the Streamlit UI to the backend, writing and debugging the pytest suite, and finally reviewing the UML and README against the finished code to make sure the docs matched reality. The most effective interactions were the ones scoped to a single concern per phase (design vs. implementation vs. testing vs. polish) rather than one long open-ended conversation — asking narrow, concrete questions like "how should the Scheduler retrieve tasks from the Owner's pets" or "what edge cases should I test for sorting and recurrence" produced more directly usable answers than broad requests like "improve my scheduler."
 
 **b. Judgment and verification**
 
-- Describe one moment where you did not accept an AI suggestion as-is.
-- How did you evaluate or verify what the AI suggested?
+One place I didn't accept the first version as-is: the original `Scheduler` design coupled `available_minutes` to the `Scheduler` object itself (a field) in addition to passing it into `build_plan()`. That's redundant state — the available time can change every day/run, so it doesn't belong on the long-lived `Scheduler` instance. I flagged this in `reflection.md` during the design phase and later removed the field, keeping `available_minutes` only as a `build_plan()` parameter. I verified the change didn't break anything by rerunning the full pytest suite and the `main.py` CLI demo after each refactor, rather than trusting the diff on inspection alone.
 
 ---
 
@@ -76,12 +75,12 @@ I'd rate my confidence at 4/5. The happy paths and the edge cases I identified a
 
 **a. What went well**
 
-- What part of this project are you most satisfied with?
+I'm most satisfied with the separation between `Task` (raw data) and `ScheduledItem` (a task placed into a concrete time slot with a reason). It meant the scheduler never had to mutate a pet's actual tasks just to produce a plan, which made it straightforward to add sorting, filtering, and conflict detection later as independent read-only operations over the same task list, without any of them stepping on each other.
 
 **b. What you would improve**
 
-- If you had another iteration, what would you improve or redesign?
+I'd redesign conflict detection to check real time-range overlap instead of exact `fixed_time` equality (see section 2b) — it's the most visible gap between what the app promises ("detect conflicts") and what it actually guarantees. I'd also add a small amount of input validation at the `Task` level (e.g. rejecting an unrecognized `recurrence` value or a non-positive `duration_minutes`) instead of relying entirely on the Streamlit form widgets to keep bad values out.
 
 **c. Key takeaway**
 
-- What is one important thing you learned about designing systems or working with AI on this project?
+Being the "lead architect" with an AI assistant meant my job was mostly deciding what should be true of the system — which constraints matter most, which tradeoffs are acceptable for this scenario's scale, when a suggestion was technically fine but architecturally redundant — while the AI handled turning those decisions into working code quickly. The moments where the design actually improved were the ones where I stopped and asked "does this match what I intended" (e.g. the `available_minutes` duplication) rather than accepting the first working version. Separate, phase-scoped conversations helped this: keeping design brainstorming, implementation, testing, and polish in their own contexts meant each response stayed focused on the actual question instead of re-explaining or re-deciding things that were already settled.

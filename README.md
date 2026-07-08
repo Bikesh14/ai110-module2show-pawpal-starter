@@ -22,6 +22,16 @@ Your final app should:
 - Display the plan clearly (and ideally explain the reasoning)
 - Include tests for the most important scheduling behaviors
 
+## ✨ Features
+
+- **Owner & pet management** — add an owner and multiple pets, each with their own independent task list.
+- **Task creation** — add care tasks with a title, duration, priority, category, and an optional fixed time of day.
+- **Sorting by time** — `Scheduler.sort_by_time()` orders tasks chronologically by fixed time, with unscheduled tasks listed last.
+- **Filtering** — `Scheduler.filter_tasks()` narrows the task list by pet and/or completion status, both in the CLI demo and the Streamlit UI.
+- **Conflict warnings** — `Scheduler.detect_conflicts()` flags any tasks (same or different pets) scheduled at the exact same fixed time, shown as `st.warning` banners in the UI instead of crashing the app.
+- **Daily/weekly recurrence** — marking a recurring task complete (`Pet.complete_task()` / `Task.mark_complete()`) automatically creates its next occurrence, due one day (or one week) later.
+- **Explainable daily plan** — `Scheduler.build_plan()` builds a time-budgeted schedule ordered by fixed time then priority, and `Scheduler.explain()` describes why each task landed where it did.
+
 ## Getting started
 
 ### Setup
@@ -42,32 +52,57 @@ pip install -r requirements.txt
 6. Connect your logic to the Streamlit UI in `app.py`.
 7. Refine UML so it matches what you actually built.
 
+The final UML, matching the implementation in `pawpal_system.py`, lives at [diagrams/uml_final.mmd](diagrams/uml_final.mmd) (the earlier draft is kept at `diagrams/uml.mmd` for history).
+
 ## 🖥️ Sample Output
 
 Output from running `python main.py`:
 
 ```
+All tasks sorted by time:
+
+  [08:00] Morning feeding
+  [08:00] Morning walk
+  [unscheduled] Litter box cleaning
+  [unscheduled] Playtime
+  [unscheduled] Give medication
+
+Pending tasks for Mochi:
+
+  Litter box cleaning
+  Morning feeding
+
+Conflict check:
+
+  WARNING: Conflict at 08:00 — Mochi: Morning feeding, Biscuit: Morning walk
+
+Completing Mochi's recurring feeding task...
+
+  Created next occurrence: Morning feeding due 2026-07-08
+
 Today's Schedule for Jordan's pets:
 
   08:00 - 08:10  [Mochi] Morning feeding (10 min, high priority)
       reason: Scheduled at its fixed time (08:00).
-  08:30 - 09:00  [Biscuit] Morning walk (30 min, high priority)
-      reason: Scheduled at its fixed time (08:30).
-  09:00 - 09:05  [Biscuit] Give medication (5 min, high priority)
+  08:00 - 08:30  [Biscuit] Morning walk (30 min, high priority)
+      reason: Scheduled at its fixed time (08:00).
+  08:30 - 08:35  [Biscuit] Give medication (5 min, high priority)
       reason: Ordered by high priority among remaining tasks.
-  09:05 - 09:10  [Mochi] Litter box cleaning (5 min, medium priority)
+  08:35 - 08:40  [Mochi] Litter box cleaning (5 min, medium priority)
       reason: Ordered by medium priority among remaining tasks.
-  09:10 - 09:30  [Biscuit] Playtime (20 min, low priority)
+  08:40 - 09:00  [Biscuit] Playtime (20 min, low priority)
       reason: Ordered by low priority among remaining tasks.
 
 Explanation:
 
 08:00 - Mochi: Morning feeding (10 min, high priority) — Scheduled at its fixed time (08:00).
-08:30 - Biscuit: Morning walk (30 min, high priority) — Scheduled at its fixed time (08:30).
-09:00 - Biscuit: Give medication (5 min, high priority) — Ordered by high priority among remaining tasks.
-09:05 - Mochi: Litter box cleaning (5 min, medium priority) — Ordered by medium priority among remaining tasks.
-09:10 - Biscuit: Playtime (20 min, low priority) — Ordered by low priority among remaining tasks.
+08:00 - Biscuit: Morning walk (30 min, high priority) — Scheduled at its fixed time (08:00).
+08:30 - Biscuit: Give medication (5 min, high priority) — Ordered by high priority among remaining tasks.
+08:35 - Mochi: Litter box cleaning (5 min, medium priority) — Ordered by medium priority among remaining tasks.
+08:40 - Biscuit: Playtime (20 min, low priority) — Ordered by low priority among remaining tasks.
 ```
+
+Note: `main.py` deliberately schedules Mochi's feeding and Biscuit's walk at the same 08:00 fixed time to demonstrate conflict detection — `build_plan()` still places both (see the exact-match tradeoff in `reflection.md`, section 2b), but `detect_conflicts()` surfaces the warning above the schedule so the owner can resolve it.
 
 ## 🧪 Testing PawPal+
 
@@ -115,12 +150,71 @@ tests/test_pawpal.py ................                                    [100%]
 
 ## 📸 Demo Walkthrough
 
-Describe your app in numbered steps so a reader can follow along without watching a video:
+**Main UI features and actions**
 
-1. <!-- Describe this step -->
-2. <!-- Describe this step -->
-3. <!-- Describe this step -->
-4. <!-- Describe this step -->
-5. <!-- Add more steps as needed -->
+- Enter an owner name at the top of the page; it's kept in `st.session_state` so it persists across interactions.
+- Add one or more pets (name + species) through the "Add pet" form.
+- Add care tasks to a chosen pet (title, duration, priority, category, and an optional fixed time) through the "Add task" form.
+- Filter and sort the current task table by pet and/or completion status.
+- Mark a pending task complete from the "Mark a task complete" expander — if it's recurring, the next occurrence is created automatically and a success message reports its due date.
+- Any tasks sharing the same fixed time are flagged as warnings above the schedule section, before you even click "Generate schedule."
+- Set the available minutes for the day and click "Generate schedule" to see the ordered plan with a reasoning explanation.
 
-**Screenshot or video** *(optional)*: <!-- Insert a screenshot or link to a demo video here -->
+**Example workflow**
+
+1. Add pet "Mochi" (cat) and pet "Biscuit" (dog).
+2. Add a task "Morning feeding" for Mochi at a fixed time of 08:00, marked as daily recurring.
+3. Add a task "Morning walk" for Biscuit, also fixed at 08:00 — the app immediately shows a conflict warning ("Conflict at 08:00 — Mochi: Morning feeding, Biscuit: Morning walk").
+4. Add a couple more untimed tasks (e.g. "Playtime", "Give medication") with different priorities.
+5. Set available minutes (e.g. 90) and click "Generate schedule" — fixed-time tasks appear first in the plan, followed by the remaining tasks ordered by priority, each with a one-line reason.
+6. Mark "Morning feeding" complete — a new "Morning feeding" task is added automatically, due the next day.
+
+**Key Scheduler behaviors shown**: fixed-time sorting, priority-based ordering of untimed tasks, time-budget enforcement (tasks that don't fit are skipped), conflict detection on duplicate fixed times, and daily recurrence on task completion.
+
+**Sample CLI output** (from `python main.py`, exercising sorting, filtering, conflict detection, and recurrence together):
+
+```
+All tasks sorted by time:
+
+  [08:00] Morning feeding
+  [08:00] Morning walk
+  [unscheduled] Litter box cleaning
+  [unscheduled] Playtime
+  [unscheduled] Give medication
+
+Pending tasks for Mochi:
+
+  Litter box cleaning
+  Morning feeding
+
+Conflict check:
+
+  WARNING: Conflict at 08:00 — Mochi: Morning feeding, Biscuit: Morning walk
+
+Completing Mochi's recurring feeding task...
+
+  Created next occurrence: Morning feeding due 2026-07-08
+
+Today's Schedule for Jordan's pets:
+
+  08:00 - 08:10  [Mochi] Morning feeding (10 min, high priority)
+      reason: Scheduled at its fixed time (08:00).
+  08:00 - 08:30  [Biscuit] Morning walk (30 min, high priority)
+      reason: Scheduled at its fixed time (08:00).
+  08:30 - 08:35  [Biscuit] Give medication (5 min, high priority)
+      reason: Ordered by high priority among remaining tasks.
+  08:35 - 08:40  [Mochi] Litter box cleaning (5 min, medium priority)
+      reason: Ordered by medium priority among remaining tasks.
+  08:40 - 09:00  [Biscuit] Playtime (20 min, low priority)
+      reason: Ordered by low priority among remaining tasks.
+
+Explanation:
+
+08:00 - Mochi: Morning feeding (10 min, high priority) — Scheduled at its fixed time (08:00).
+08:00 - Biscuit: Morning walk (30 min, high priority) — Scheduled at its fixed time (08:00).
+08:30 - Biscuit: Give medication (5 min, high priority) — Ordered by high priority among remaining tasks.
+08:35 - Mochi: Litter box cleaning (5 min, medium priority) — Ordered by medium priority among remaining tasks.
+08:40 - Biscuit: Playtime (20 min, low priority) — Ordered by low priority among remaining tasks.
+```
+
+**Screenshot or video** *(optional)*: not included — the text walkthrough and CLI output above are the primary demo evidence.

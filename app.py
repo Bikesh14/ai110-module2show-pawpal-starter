@@ -86,25 +86,73 @@ if owner.pets:
 else:
     st.info("Add a pet before adding tasks.")
 
+scheduler = Scheduler()
 all_tasks = owner.get_all_tasks()
+
 if all_tasks:
     st.write("Current tasks:")
+
+    filter_col1, filter_col2 = st.columns(2)
+    with filter_col1:
+        filter_pet = st.selectbox("Filter by pet", ["All"] + [p.name for p in owner.pets])
+    with filter_col2:
+        filter_status = st.selectbox("Filter by status", ["All", "Pending", "Completed"])
+
+    filtered = scheduler.filter_tasks(
+        owner,
+        pet_name=None if filter_pet == "All" else filter_pet,
+        completed=None if filter_status == "All" else filter_status == "Completed",
+    )
+    # sort_by_time() expects plain Task objects; keep the owning pet alongside for display/actions.
+    task_to_pet = {task.id: pet for pet, task in all_tasks}
+    sorted_filtered = scheduler.sort_by_time(filtered)
+
     st.table(
         [
             {
-                "pet": pet.name,
+                "pet": task_to_pet[task.id].name,
                 "title": task.title,
                 "duration_minutes": task.duration_minutes,
                 "priority": task.priority,
                 "category": task.category,
                 "fixed_time": task.fixed_time.strftime("%H:%M") if task.fixed_time else "",
+                "recurrence": task.recurrence or "",
                 "completed": task.completed,
             }
-            for pet, task in all_tasks
+            for task in sorted_filtered
         ]
     )
+
+    with st.expander("Mark a task complete"):
+        pending = [t for t in sorted_filtered if not t.completed]
+        if pending:
+            task_labels = {f"{task_to_pet[t.id].name}: {t.title}": t for t in pending}
+            chosen_label = st.selectbox("Task", list(task_labels.keys()))
+            if st.button("Mark complete"):
+                chosen_task = task_labels[chosen_label]
+                pet = task_to_pet[chosen_task.id]
+                next_task = pet.complete_task(chosen_task.id)
+                if next_task:
+                    st.success(
+                        f"Completed '{chosen_task.title}'. Next occurrence created for "
+                        f"{next_task.due_date}."
+                    )
+                else:
+                    st.success(f"Completed '{chosen_task.title}'.")
+                st.rerun()
+        else:
+            st.info("No pending tasks to complete for this filter.")
 else:
     st.info("No tasks yet. Add one above.")
+
+st.divider()
+
+# --- Conflicts -------------------------------------------------------------
+conflicts = scheduler.detect_conflicts(owner)
+if conflicts:
+    st.subheader("⚠️ Scheduling Conflicts")
+    for warning in conflicts:
+        st.warning(warning)
 
 st.divider()
 
@@ -115,12 +163,6 @@ available_minutes = st.number_input(
 )
 
 if st.button("Generate schedule"):
-    scheduler = Scheduler()
-
-    conflicts = scheduler.detect_conflicts(owner)
-    for warning in conflicts:
-        st.warning(f"⚠️ {warning}")
-
     plan = scheduler.build_plan(owner, available_minutes=int(available_minutes))
 
     if not plan:
