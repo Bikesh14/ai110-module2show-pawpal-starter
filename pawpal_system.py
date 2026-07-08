@@ -1,6 +1,7 @@
 """Core backend logic for PawPal+: owners, pets, tasks, and scheduling."""
 
-from dataclasses import dataclass, field, replace
+import json
+from dataclasses import asdict, dataclass, field, replace
 from datetime import date, datetime, time, timedelta
 from typing import Optional
 
@@ -92,6 +93,38 @@ class Owner:
     def get_all_tasks(self) -> list[tuple[Pet, Task]]:
         """Return (pet, task) pairs for every task across all of this owner's pets."""
         return [(pet, task) for pet in self.pets for task in pet.tasks]
+
+    def save_to_json(self, path: str) -> None:
+        """Serialize this owner (and all pets/tasks) to a JSON file."""
+        data = asdict(self)
+        for pet in data["pets"]:
+            for task in pet["tasks"]:
+                if task["fixed_time"] is not None:
+                    task["fixed_time"] = task["fixed_time"].isoformat()
+                if task["due_date"] is not None:
+                    task["due_date"] = task["due_date"].isoformat()
+        with open(path, "w") as f:
+            json.dump(data, f, indent=2)
+
+    @classmethod
+    def load_from_json(cls, path: str) -> "Owner":
+        """Load an owner (and all pets/tasks) from a JSON file previously written by save_to_json."""
+        with open(path) as f:
+            data = json.load(f)
+
+        pets = []
+        for pet_data in data["pets"]:
+            tasks = []
+            for task_data in pet_data["tasks"]:
+                task_data = dict(task_data)
+                if task_data["fixed_time"] is not None:
+                    task_data["fixed_time"] = time.fromisoformat(task_data["fixed_time"])
+                if task_data["due_date"] is not None:
+                    task_data["due_date"] = date.fromisoformat(task_data["due_date"])
+                tasks.append(Task(**task_data))
+            pets.append(Pet(name=pet_data["name"], species=pet_data["species"], tasks=tasks))
+
+        return cls(name=data["name"], preferences=data["preferences"], pets=pets)
 
 
 @dataclass
@@ -199,6 +232,47 @@ class Scheduler:
         if completed is not None:
             pairs = [(pet, task) for pet, task in pairs if task.completed == completed]
         return [task for _, task in pairs]
+
+    def sort_by_priority(self, tasks: list[Task]) -> list[Task]:
+        """Sort tasks by priority first (high > medium > low), then by fixed_time."""
+        return sorted(
+            tasks,
+            key=lambda task: (
+                PRIORITY_ORDER.get(task.priority, 3),
+                task.fixed_time is None,
+                task.fixed_time or time(0, 0),
+            ),
+        )
+
+    def find_next_available_slot(
+        self, owner: Owner, duration_minutes: int, day_end: time = time(20, 0)
+    ) -> Optional[time]:
+        """Find the earliest open time slot (of at least duration_minutes) around existing fixed-time tasks."""
+        busy = sorted(
+            (
+                (task.fixed_time, task.duration_minutes)
+                for _, task in owner.get_all_tasks()
+                if task.fixed_time is not None and not task.completed
+            )
+        )
+
+        cursor = datetime.combine(datetime.min.date(), self.day_start)
+        day_end_dt = datetime.combine(datetime.min.date(), day_end)
+
+        for fixed_time, busy_duration in busy:
+            busy_start = datetime.combine(datetime.min.date(), fixed_time)
+            if busy_start < cursor:
+                # Overlaps a slot already claimed by an earlier task; skip past it.
+                cursor = max(cursor, busy_start + timedelta(minutes=busy_duration))
+                continue
+            gap_minutes = (busy_start - cursor).total_seconds() / 60
+            if gap_minutes >= duration_minutes:
+                return cursor.time()
+            cursor = busy_start + timedelta(minutes=busy_duration)
+
+        if (day_end_dt - cursor).total_seconds() / 60 >= duration_minutes:
+            return cursor.time()
+        return None
 
     def detect_conflicts(self, owner: Owner) -> list[str]:
         """Return warning messages for tasks with the same fixed_time (same or different pets)."""

@@ -2,7 +2,18 @@
 
 from datetime import date, time
 
+from tabulate import tabulate
+
 from pawpal_system import Owner, Pet, Scheduler, Task
+
+CATEGORY_EMOJI = {
+    "walk": "🚶",
+    "feeding": "🍽️",
+    "meds": "💊",
+    "grooming": "🧼",
+    "enrichment": "🧸",
+    "general": "📌",
+}
 
 
 def build_demo_owner() -> Owner:
@@ -68,48 +79,84 @@ def build_demo_owner() -> Owner:
     return owner
 
 
+def task_row(pet_name: str, task: Task) -> list:
+    emoji = CATEGORY_EMOJI.get(task.category, "📌")
+    status = "✅ done" if task.completed else "⏳ pending"
+    fixed = task.fixed_time.strftime("%H:%M") if task.fixed_time else "—"
+    return [pet_name, f"{emoji} {task.title}", fixed, f"{task.duration_minutes} min", task.priority, status]
+
+
+def print_task_table(rows: list) -> None:
+    print(
+        tabulate(
+            rows,
+            headers=["Pet", "Task", "Time", "Duration", "Priority", "Status"],
+            tablefmt="github",
+        )
+    )
+
+
+def section(title: str) -> None:
+    print(f"\n=== {title} ===\n")
+
+
 def main() -> None:
     owner = build_demo_owner()
     scheduler = Scheduler(day_start=time(8, 0))
+    all_pairs = owner.get_all_tasks()
 
-    all_tasks = [task for _, task in owner.get_all_tasks()]
+    section("📋 All Tasks (sorted by time)")
+    sorted_tasks = scheduler.sort_by_time([task for _, task in all_pairs])
+    pet_by_task_id = {task.id: pet.name for pet, task in all_pairs}
+    print_task_table([task_row(pet_by_task_id[t.id], t) for t in sorted_tasks])
 
-    print("All tasks sorted by time:\n")
-    for task in scheduler.sort_by_time(all_tasks):
-        fixed = task.fixed_time.strftime("%H:%M") if task.fixed_time else "unscheduled"
-        print(f"  [{fixed}] {task.title}")
+    section("🔥 All Tasks (sorted by priority)")
+    priority_sorted = scheduler.sort_by_priority([task for _, task in all_pairs])
+    print_task_table([task_row(pet_by_task_id[t.id], t) for t in priority_sorted])
 
-    print("\nPending tasks for Mochi:\n")
-    for task in scheduler.filter_tasks(owner, pet_name="Mochi", completed=False):
-        print(f"  {task.title}")
+    section("🐱 Pending Tasks for Mochi")
+    pending = scheduler.filter_tasks(owner, pet_name="Mochi", completed=False)
+    print_task_table([task_row("Mochi", t) for t in pending])
 
-    print("\nConflict check:\n")
+    section("⚠️  Conflict Check")
     conflicts = scheduler.detect_conflicts(owner)
     if conflicts:
         for warning in conflicts:
-            print(f"  WARNING: {warning}")
+            print(f"  ⚠️  {warning}")
     else:
-        print("  No conflicts detected.")
+        print("  ✅ No conflicts detected.")
 
-    print("\nCompleting Mochi's recurring feeding task...\n")
+    section("🕒 Next Available Slot")
+    slot = scheduler.find_next_available_slot(owner, duration_minutes=15)
+    print(f"  Next 15-minute opening: {slot.strftime('%H:%M') if slot else 'none available today'}")
+
+    section("🔁 Completing Mochi's Recurring Feeding Task")
     mochi = owner.pets[0]
     next_task = mochi.complete_task("t1")
     if next_task:
-        print(f"  Created next occurrence: {next_task.title} due {next_task.due_date}")
+        print(f"  ✅ Completed. Next occurrence '{next_task.title}' created, due {next_task.due_date}.")
 
+    section(f"📅 Today's Schedule for {owner.name}'s Pets")
     plan = scheduler.build_plan(owner, available_minutes=90)
+    schedule_rows = [
+        [
+            f"{item.start_time.strftime('%H:%M')}-{item.end_time.strftime('%H:%M')}",
+            item.pet.name,
+            f"{CATEGORY_EMOJI.get(item.task.category, '📌')} {item.task.title}",
+            item.task.priority,
+            item.reason,
+        ]
+        for item in plan
+    ]
+    print(tabulate(schedule_rows, headers=["Time", "Pet", "Task", "Priority", "Reason"], tablefmt="github"))
 
-    print(f"\nToday's Schedule for {owner.name}'s pets:\n")
-    for item in plan:
-        print(
-            f"  {item.start_time.strftime('%H:%M')} - {item.end_time.strftime('%H:%M')}  "
-            f"[{item.pet.name}] {item.task.title} "
-            f"({item.task.duration_minutes} min, {item.task.priority} priority)"
-        )
-        print(f"      reason: {item.reason}")
-
-    print("\nExplanation:\n")
+    section("💬 Explanation")
     print(scheduler.explain(plan))
+
+    section("💾 Persistence")
+    owner.save_to_json("data.json")
+    reloaded = Owner.load_from_json("data.json")
+    print(f"  Saved to data.json and reloaded: {reloaded.name} with {len(reloaded.pets)} pet(s).")
 
 
 if __name__ == "__main__":

@@ -59,47 +59,66 @@ The final UML, matching the implementation in `pawpal_system.py`, lives at [diag
 Output from running `python main.py`:
 
 ```
-All tasks sorted by time:
+=== 📋 All Tasks (sorted by time) ===
 
-  [08:00] Morning feeding
-  [08:00] Morning walk
-  [unscheduled] Litter box cleaning
-  [unscheduled] Playtime
-  [unscheduled] Give medication
+| Pet     | Task                  | Time   | Duration   | Priority   | Status    |
+|---------|-----------------------|--------|------------|------------|-----------|
+| Mochi   | 🍽️ Morning feeding    | 08:00  | 10 min     | high       | ⏳ pending |
+| Biscuit | 🚶 Morning walk        | 08:00  | 30 min     | high       | ⏳ pending |
+| Mochi   | 🧼 Litter box cleaning | —      | 5 min      | medium     | ⏳ pending |
+| Biscuit | 🧸 Playtime            | —      | 20 min     | low        | ⏳ pending |
+| Biscuit | 💊 Give medication     | —      | 5 min      | high       | ⏳ pending |
 
-Pending tasks for Mochi:
+=== 🔥 All Tasks (sorted by priority) ===
 
-  Litter box cleaning
-  Morning feeding
+| Pet     | Task                  | Time   | Duration   | Priority   | Status    |
+|---------|-----------------------|--------|------------|------------|-----------|
+| Mochi   | 🍽️ Morning feeding    | 08:00  | 10 min     | high       | ⏳ pending |
+| Biscuit | 🚶 Morning walk        | 08:00  | 30 min     | high       | ⏳ pending |
+| Biscuit | 💊 Give medication     | —      | 5 min      | high       | ⏳ pending |
+| Mochi   | 🧼 Litter box cleaning | —      | 5 min      | medium     | ⏳ pending |
+| Biscuit | 🧸 Playtime            | —      | 20 min     | low        | ⏳ pending |
 
-Conflict check:
+=== 🐱 Pending Tasks for Mochi ===
 
-  WARNING: Conflict at 08:00 — Mochi: Morning feeding, Biscuit: Morning walk
+| Pet   | Task                  | Time   | Duration   | Priority   | Status    |
+|-------|-----------------------|--------|------------|------------|-----------|
+| Mochi | 🧼 Litter box cleaning | —      | 5 min      | medium     | ⏳ pending |
+| Mochi | 🍽️ Morning feeding    | 08:00  | 10 min     | high       | ⏳ pending |
 
-Completing Mochi's recurring feeding task...
+=== ⚠️  Conflict Check ===
 
-  Created next occurrence: Morning feeding due 2026-07-08
+  ⚠️  Conflict at 08:00 — Mochi: Morning feeding, Biscuit: Morning walk
 
-Today's Schedule for Jordan's pets:
+=== 🕒 Next Available Slot ===
 
-  08:00 - 08:10  [Mochi] Morning feeding (10 min, high priority)
-      reason: Scheduled at its fixed time (08:00).
-  08:00 - 08:30  [Biscuit] Morning walk (30 min, high priority)
-      reason: Scheduled at its fixed time (08:00).
-  08:30 - 08:35  [Biscuit] Give medication (5 min, high priority)
-      reason: Ordered by high priority among remaining tasks.
-  08:35 - 08:40  [Mochi] Litter box cleaning (5 min, medium priority)
-      reason: Ordered by medium priority among remaining tasks.
-  08:40 - 09:00  [Biscuit] Playtime (20 min, low priority)
-      reason: Ordered by low priority among remaining tasks.
+  Next 15-minute opening: 08:30
 
-Explanation:
+=== 🔁 Completing Mochi's Recurring Feeding Task ===
+
+  ✅ Completed. Next occurrence 'Morning feeding' created, due 2026-07-08.
+
+=== 📅 Today's Schedule for Jordan's Pets ===
+
+| Time        | Pet     | Task                  | Priority   | Reason                                            |
+|-------------|---------|-----------------------|------------|---------------------------------------------------|
+| 08:00-08:10 | Mochi   | 🍽️ Morning feeding    | high       | Scheduled at its fixed time (08:00).              |
+| 08:00-08:30 | Biscuit | 🚶 Morning walk        | high       | Scheduled at its fixed time (08:00).              |
+| 08:30-08:35 | Biscuit | 💊 Give medication     | high       | Ordered by high priority among remaining tasks.   |
+| 08:35-08:40 | Mochi   | 🧼 Litter box cleaning | medium     | Ordered by medium priority among remaining tasks. |
+| 08:40-09:00 | Biscuit | 🧸 Playtime            | low        | Ordered by low priority among remaining tasks.    |
+
+=== 💬 Explanation ===
 
 08:00 - Mochi: Morning feeding (10 min, high priority) — Scheduled at its fixed time (08:00).
 08:00 - Biscuit: Morning walk (30 min, high priority) — Scheduled at its fixed time (08:00).
 08:30 - Biscuit: Give medication (5 min, high priority) — Ordered by high priority among remaining tasks.
 08:35 - Mochi: Litter box cleaning (5 min, medium priority) — Ordered by medium priority among remaining tasks.
 08:40 - Biscuit: Playtime (20 min, low priority) — Ordered by low priority among remaining tasks.
+
+=== 💾 Persistence ===
+
+  Saved to data.json and reloaded: Jordan with 2 pet(s).
 ```
 
 Note: `main.py` deliberately schedules Mochi's feeding and Biscuit's walk at the same 08:00 fixed time to demonstrate conflict detection — `build_plan()` still places both (see the exact-match tradeoff in `reflection.md`, section 2b), but `detect_conflicts()` surfaces the warning above the schedule so the owner can resolve it.
@@ -114,14 +133,16 @@ python -m pytest
 pytest --cov
 ```
 
-The suite in `tests/test_pawpal.py` (16 tests) covers:
+The suite in `tests/test_pawpal.py` (21 tests) covers:
 
 - **Task completion**: `mark_complete()` flips `completed`, and adding a task increases a pet's task count.
-- **Sorting**: `sort_by_time()` orders fixed-time tasks chronologically, puts unscheduled tasks last, and is stable when two tasks share a time.
+- **Sorting**: `sort_by_time()` orders fixed-time tasks chronologically, puts unscheduled tasks last, and is stable when two tasks share a time; `sort_by_priority()` orders high before low priority.
 - **Filtering**: `filter_tasks()` by pet name, by completion status, and by both together.
 - **Conflict detection**: `detect_conflicts()` flags two tasks (same or different pets) at the same `fixed_time`, ignores distinct times, and returns no warnings when no tasks have a fixed time.
 - **Recurring tasks**: completing a `daily` task creates a next occurrence due `+1 day`; completing a `weekly` task advances `+7 days`; completing a non-recurring task creates no next occurrence; `Pet.complete_task()` adds the new occurrence to the pet's task list.
 - **Scheduling edge cases**: an owner with no pets, and a pet with no tasks, both produce an empty plan without errors; `build_plan()` respects the available-minutes budget and skips already-completed tasks.
+- **Next available slot**: finds an opening before the first fixed-time task, skips a gap too small to fit the requested duration, and returns `None` when the day is fully booked.
+- **Persistence**: `save_to_json`/`load_from_json` round-trip an owner with a recurring, fixed-time task without losing any field.
 
 Sample test output:
 
@@ -129,24 +150,35 @@ Sample test output:
 ============================= test session starts ==============================
 platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
 rootdir: /Users/.../pawpal-starter
-collected 16 items
+collected 21 items
 
-tests/test_pawpal.py ................                                    [100%]
+tests/test_pawpal.py .....................                               [100%]
 
-============================== 16 passed in 0.01s ==============================
+============================== 21 passed in 0.01s ==============================
 ```
 
 **Confidence Level:** ⭐⭐⭐⭐☆ (4/5) — core scheduling, sorting, filtering, and recurrence logic are well covered and passing. The main known gap is that conflict detection only catches exact-time matches, not true duration overlaps (see `reflection.md`, section 2b), so it's not yet a full guarantee against double-booking.
 
 ## 📐 Smarter Scheduling
 
-| Feature | Method(s) | Notes |
-|---------|-----------|-------|
-| Task sorting | `Scheduler.sort_by_time()` | Sorts tasks by `fixed_time` ("HH:MM"); tasks with no fixed time sort last. |
-| Filtering | `Scheduler.filter_tasks()` | Filters an owner's tasks by `pet_name` and/or `completed` status. |
-| Time-budget filtering | `Scheduler.build_plan()` | Skips a candidate task once it no longer fits in the remaining available minutes. |
-| Conflict handling | `Scheduler.detect_conflicts()` | Flags tasks (same or different pets) that share the same exact `fixed_time`; returns warning strings instead of raising. See reflection.md 2b for the exact-match vs. overlap tradeoff. |
-| Recurring tasks | `Task.mark_complete()`, `Task.next_occurrence()`, `Pet.complete_task()` | Completing a `daily`/`weekly` task automatically creates and adds its next occurrence, due one cycle later (via `timedelta`). |
+| Feature               | Method(s)                                                                     | Notes                                                                                                                                                                                    |
+| --------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Task sorting          | `Scheduler.sort_by_time()`                                                  | Sorts tasks by`fixed_time` ("HH:MM"); tasks with no fixed time sort last.                                                                                                              |
+| Filtering             | `Scheduler.filter_tasks()`                                                  | Filters an owner's tasks by`pet_name` and/or `completed` status.                                                                                                                     |
+| Time-budget filtering | `Scheduler.build_plan()`                                                    | Skips a candidate task once it no longer fits in the remaining available minutes.                                                                                                        |
+| Conflict handling     | `Scheduler.detect_conflicts()`                                              | Flags tasks (same or different pets) that share the same exact`fixed_time`; returns warning strings instead of raising. See reflection.md 2b for the exact-match vs. overlap tradeoff. |
+| Recurring tasks       | `Task.mark_complete()`, `Task.next_occurrence()`, `Pet.complete_task()` | Completing a`daily`/`weekly` task automatically creates and adds its next occurrence, due one cycle later (via `timedelta`).                                                       |
+| Priority sorting      | `Scheduler.sort_by_priority()`                                              | Sorts tasks by priority first (high → medium → low), then by fixed time. Complements `sort_by_time()`, which sorts time-first. |
+| Next available slot   | `Scheduler.find_next_available_slot(owner, duration_minutes)`              | Scans existing fixed-time tasks in time order and returns the earliest open gap (at or after `day_start`, before `day_end`) big enough to fit a new task; returns `None` if the day is full. |
+
+## 🧩 Optional Extensions
+
+Beyond the core requirements, this project also implements the following stretch challenges:
+
+- **Advanced algorithmic capability**: `Scheduler.find_next_available_slot()` (see table above and `ai_interactions.md` for the AI agent workflow used to build it).
+- **Data persistence**: `Owner.save_to_json(path)` and `Owner.load_from_json(path)` serialize/deserialize the full owner → pets → tasks tree to/from a JSON file (default `data.json`, gitignored since it's generated data, not source). `time` and `date` fields are converted to/from ISO strings since they aren't natively JSON-serializable. In the Streamlit app, "💾 Save to data.json" and "📂 Load from data.json" buttons let you persist and restore the session's `Owner` between app runs.
+- **Advanced priority scheduling**: `Scheduler.sort_by_priority()` sorts tasks by priority first, then by fixed time — see the CLI output below for a side-by-side with `sort_by_time()`.
+- **Professional UI and output formatting**: `main.py` now renders tables with the `tabulate` library and adds category emojis (🍽️ feeding, 🚶 walk, 💊 meds, 🧼 grooming, 🧸 enrichment) and status indicators (✅ done / ⏳ pending) instead of plain `print()` lines.
 
 ## 📸 Demo Walkthrough
 

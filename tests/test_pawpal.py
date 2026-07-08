@@ -208,3 +208,79 @@ def test_sort_by_time_is_stable_for_tasks_at_same_time():
     result = scheduler.sort_by_time([first, second])
 
     assert [t.id for t in result] == ["t1", "t2"]
+
+
+def test_sort_by_priority_orders_high_before_low():
+    scheduler = Scheduler()
+    low = Task(id="t1", title="Play", duration_minutes=10, priority="low", fixed_time=time(7, 0))
+    high = Task(id="t2", title="Feed", duration_minutes=10, priority="high", fixed_time=time(9, 0))
+
+    result = scheduler.sort_by_priority([low, high])
+
+    assert [t.id for t in result] == ["t2", "t1"]
+
+
+def test_find_next_available_slot_fits_before_first_fixed_task():
+    owner = Owner(name="Jordan")
+    pet = Pet(name="Mochi", species="cat")
+    pet.add_task(Task(id="t1", title="Walk", duration_minutes=30, priority="high", fixed_time=time(9, 0)))
+    owner.add_pet(pet)
+
+    scheduler = Scheduler(day_start=time(8, 0))
+    slot = scheduler.find_next_available_slot(owner, duration_minutes=30)
+
+    assert slot == time(8, 0)
+
+
+def test_find_next_available_slot_skips_busy_gap_too_small():
+    owner = Owner(name="Jordan")
+    pet = Pet(name="Mochi", species="cat")
+    pet.add_task(Task(id="t1", title="Walk", duration_minutes=30, priority="high", fixed_time=time(8, 0)))
+    owner.add_pet(pet)
+
+    scheduler = Scheduler(day_start=time(8, 0))
+    slot = scheduler.find_next_available_slot(owner, duration_minutes=15)
+
+    assert slot == time(8, 30)
+
+
+def test_find_next_available_slot_returns_none_when_day_is_full():
+    owner = Owner(name="Jordan")
+    pet = Pet(name="Mochi", species="cat")
+    pet.add_task(Task(id="t1", title="All day", duration_minutes=720, priority="high", fixed_time=time(8, 0)))
+    owner.add_pet(pet)
+
+    scheduler = Scheduler(day_start=time(8, 0))
+    slot = scheduler.find_next_available_slot(owner, duration_minutes=30, day_end=time(20, 0))
+
+    assert slot is None
+
+
+def test_save_and_load_json_round_trip(tmp_path):
+    owner = Owner(name="Jordan")
+    pet = Pet(name="Mochi", species="cat")
+    pet.add_task(
+        Task(
+            id="t1",
+            title="Feed",
+            duration_minutes=10,
+            priority="high",
+            fixed_time=time(8, 0),
+            is_recurring=True,
+            recurrence="daily",
+            due_date=date.today(),
+        )
+    )
+    owner.add_pet(pet)
+
+    path = tmp_path / "data.json"
+    owner.save_to_json(str(path))
+    loaded = Owner.load_from_json(str(path))
+
+    assert loaded.name == "Jordan"
+    assert len(loaded.pets) == 1
+    assert loaded.pets[0].name == "Mochi"
+    loaded_task = loaded.pets[0].tasks[0]
+    assert loaded_task.title == "Feed"
+    assert loaded_task.fixed_time == time(8, 0)
+    assert loaded_task.due_date == date.today()

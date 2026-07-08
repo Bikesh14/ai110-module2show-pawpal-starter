@@ -1,8 +1,11 @@
+import os
 import uuid
 
 import streamlit as st
 
 from pawpal_system import Owner, Pet, Scheduler, Task
+
+DATA_FILE = "data.json"
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
@@ -21,6 +24,24 @@ if "owner" not in st.session_state:
     st.session_state.owner = Owner(name="Jordan")
 
 owner: Owner = st.session_state.owner
+
+st.divider()
+
+# --- Persistence -------------------------------------------------------------
+st.subheader("Save / Load")
+save_col, load_col = st.columns(2)
+with save_col:
+    if st.button("💾 Save to data.json"):
+        owner.save_to_json(DATA_FILE)
+        st.success(f"Saved to {DATA_FILE}")
+with load_col:
+    if st.button("📂 Load from data.json"):
+        if os.path.exists(DATA_FILE):
+            st.session_state.owner = Owner.load_from_json(DATA_FILE)
+            st.success(f"Loaded from {DATA_FILE}")
+            st.rerun()
+        else:
+            st.warning(f"{DATA_FILE} not found. Save first.")
 
 st.divider()
 
@@ -155,6 +176,19 @@ if conflicts:
         st.warning(warning)
 
 st.divider()
+
+# --- Next available slot ----------------------------------------------------
+if all_tasks:
+    st.subheader("Find Next Available Slot")
+    slot_duration = st.number_input("Slot duration (minutes)", min_value=5, max_value=240, value=15)
+    if st.button("Find slot"):
+        slot = scheduler.find_next_available_slot(owner, duration_minutes=int(slot_duration))
+        if slot:
+            st.success(f"Next open slot: {slot.strftime('%H:%M')}")
+        else:
+            st.warning("No open slot of that length remains today.")
+
+    st.divider()
 
 # --- Schedule ------------------------------------------------------------
 st.subheader("Build Schedule")
