@@ -155,3 +155,56 @@ def test_pet_complete_task_adds_next_occurrence_to_pet():
 
     assert len(pet.tasks) == 2
     assert pet.tasks[1].due_date == date.today() + timedelta(days=1)
+
+
+def test_weekly_recurrence_advances_by_seven_days():
+    today = date.today()
+    task = Task(
+        id="t1",
+        title="Grooming",
+        duration_minutes=30,
+        priority="medium",
+        is_recurring=True,
+        recurrence="weekly",
+        due_date=today,
+    )
+
+    next_task = task.mark_complete()
+
+    assert next_task.due_date == today + timedelta(weeks=1)
+
+
+def test_build_plan_with_no_pets_returns_empty_plan():
+    owner = Owner(name="Jordan")
+    scheduler = Scheduler()
+
+    assert scheduler.build_plan(owner, available_minutes=120) == []
+
+
+def test_build_plan_with_pet_that_has_no_tasks():
+    owner = Owner(name="Jordan")
+    owner.add_pet(Pet(name="Mochi", species="cat"))
+    scheduler = Scheduler()
+
+    assert scheduler.build_plan(owner, available_minutes=120) == []
+
+
+def test_detect_conflicts_with_no_fixed_time_tasks_returns_no_warnings():
+    owner = Owner(name="Jordan")
+    pet = Pet(name="Mochi", species="cat")
+    pet.add_task(Task(id="t1", title="Play", duration_minutes=10, priority="low"))
+    owner.add_pet(pet)
+
+    scheduler = Scheduler()
+
+    assert scheduler.detect_conflicts(owner) == []
+
+
+def test_sort_by_time_is_stable_for_tasks_at_same_time():
+    scheduler = Scheduler()
+    first = Task(id="t1", title="Feed", duration_minutes=10, priority="high", fixed_time=time(8, 0))
+    second = Task(id="t2", title="Walk", duration_minutes=30, priority="high", fixed_time=time(8, 0))
+
+    result = scheduler.sort_by_time([first, second])
+
+    assert [t.id for t in result] == ["t1", "t2"]

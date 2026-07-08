@@ -64,13 +64,11 @@ This tradeoff is reasonable for a small pet-care scheduler: task counts per pet 
 
 **a. What you tested**
 
-- What behaviors did you test?
-- Why were these tests important?
+16 tests in `tests/test_pawpal.py` cover: task completion (`mark_complete`, task count on a pet), sorting (`sort_by_time` chronological order, unscheduled-last, stability for ties), filtering (`filter_tasks` by pet, by completion, by both), conflict detection (same-time flagged, distinct times ignored, no fixed-time tasks produce no warnings), recurrence (daily → +1 day, weekly → +7 days, non-recurring produces no next occurrence, `Pet.complete_task` actually appends the new occurrence), and scheduling edge cases (no pets, a pet with no tasks, respecting the available-minutes budget, skipping completed tasks). These behaviors were prioritized because they're the "smart" parts of the system — the parts most likely to silently produce a wrong schedule rather than crash outright.
 
 **b. Confidence**
 
-- How confident are you that your scheduler works correctly?
-- What edge cases would you test next if you had more time?
+I'd rate my confidence at 4/5. The happy paths and the edge cases I identified are solidly covered and all 16 tests pass. The gap I'm most aware of is duration-overlap conflict detection (currently only exact `fixed_time` matches are caught — see 2b), and I haven't tested what happens with malformed input (e.g. a `recurrence` value outside `"daily"`/`"weekly"`, or a negative `duration_minutes`), since the UI currently constrains those values before they reach the backend. If I had more time I'd add tests for: two recurring tasks completing in the same run, a task whose duration exceeds `available_minutes` entirely, and true time-range overlap (not just identical start times) once that logic is implemented.
 
 ---
 

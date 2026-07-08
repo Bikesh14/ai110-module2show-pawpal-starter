@@ -73,17 +73,35 @@ Explanation:
 
 ```bash
 # Run the full test suite:
-pytest
+python -m pytest
 
 # Run with coverage:
 pytest --cov
 ```
 
+The suite in `tests/test_pawpal.py` (16 tests) covers:
+
+- **Task completion**: `mark_complete()` flips `completed`, and adding a task increases a pet's task count.
+- **Sorting**: `sort_by_time()` orders fixed-time tasks chronologically, puts unscheduled tasks last, and is stable when two tasks share a time.
+- **Filtering**: `filter_tasks()` by pet name, by completion status, and by both together.
+- **Conflict detection**: `detect_conflicts()` flags two tasks (same or different pets) at the same `fixed_time`, ignores distinct times, and returns no warnings when no tasks have a fixed time.
+- **Recurring tasks**: completing a `daily` task creates a next occurrence due `+1 day`; completing a `weekly` task advances `+7 days`; completing a non-recurring task creates no next occurrence; `Pet.complete_task()` adds the new occurrence to the pet's task list.
+- **Scheduling edge cases**: an owner with no pets, and a pet with no tasks, both produce an empty plan without errors; `build_plan()` respects the available-minutes budget and skips already-completed tasks.
+
 Sample test output:
 
 ```
-# Paste your pytest output here
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/.../pawpal-starter
+collected 16 items
+
+tests/test_pawpal.py ................                                    [100%]
+
+============================== 16 passed in 0.01s ==============================
 ```
+
+**Confidence Level:** ⭐⭐⭐⭐☆ (4/5) — core scheduling, sorting, filtering, and recurrence logic are well covered and passing. The main known gap is that conflict detection only catches exact-time matches, not true duration overlaps (see `reflection.md`, section 2b), so it's not yet a full guarantee against double-booking.
 
 ## 📐 Smarter Scheduling
 
