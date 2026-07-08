@@ -1,10 +1,11 @@
 """Core backend logic for PawPal+: owners, pets, tasks, and scheduling."""
 
-from dataclasses import dataclass, field
-from datetime import datetime, time, timedelta
+from dataclasses import dataclass, field, replace
+from datetime import date, datetime, time, timedelta
 from typing import Optional
 
 PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
+RECURRENCE_DELTAS = {"daily": timedelta(days=1), "weekly": timedelta(weeks=1)}
 
 
 @dataclass
@@ -20,14 +21,29 @@ class Task:
     is_recurring: bool = False
     recurrence: Optional[str] = None  # e.g. "daily", "weekly"
     completed: bool = False
+    due_date: Optional[date] = None
 
-    def mark_complete(self) -> None:
-        """Mark this task as completed."""
+    def mark_complete(self) -> Optional["Task"]:
+        """Mark this task as completed; return the next occurrence if it recurs."""
         self.completed = True
+        if self.is_recurring and self.recurrence in RECURRENCE_DELTAS:
+            return self.next_occurrence()
+        return None
 
     def mark_incomplete(self) -> None:
         """Reset this task to not completed (e.g. for a new recurring cycle)."""
         self.completed = False
+
+    def next_occurrence(self) -> "Task":
+        """Build the next instance of a recurring task, due one cycle later."""
+        delta = RECURRENCE_DELTAS[self.recurrence]
+        base_date = self.due_date or date.today()
+        return replace(
+            self,
+            id=f"{self.id}-{(base_date + delta).isoformat()}",
+            due_date=base_date + delta,
+            completed=False,
+        )
 
 
 @dataclass
@@ -49,6 +65,16 @@ class Pet:
     def pending_tasks(self) -> list[Task]:
         """Return this pet's tasks that are not yet completed."""
         return [t for t in self.tasks if not t.completed]
+
+    def complete_task(self, task_id: str) -> Optional[Task]:
+        """Mark a task complete by id, adding its next occurrence if it recurs."""
+        task = next((t for t in self.tasks if t.id == task_id), None)
+        if task is None:
+            return None
+        next_task = task.mark_complete()
+        if next_task is not None:
+            self.add_task(next_task)
+        return next_task
 
 
 @dataclass
@@ -152,3 +178,43 @@ class Scheduler:
             for item in plan
         ]
         return "\n".join(lines)
+
+    def sort_by_time(self, tasks: list[Task]) -> list[Task]:
+        """Sort tasks by fixed_time (HH:MM); tasks with no fixed time sort last."""
+        return sorted(
+            tasks,
+            key=lambda task: (task.fixed_time is None, task.fixed_time or time(0, 0)),
+        )
+
+    def filter_tasks(
+        self,
+        owner: Owner,
+        pet_name: Optional[str] = None,
+        completed: Optional[bool] = None,
+    ) -> list[Task]:
+        """Filter tasks across an owner's pets by pet name and/or completion status."""
+        pairs = owner.get_all_tasks()
+        if pet_name is not None:
+            pairs = [(pet, task) for pet, task in pairs if pet.name == pet_name]
+        if completed is not None:
+            pairs = [(pet, task) for pet, task in pairs if task.completed == completed]
+        return [task for _, task in pairs]
+
+    def detect_conflicts(self, owner: Owner) -> list[str]:
+        """Return warning messages for tasks with the same fixed_time (same or different pets)."""
+        warnings: list[str] = []
+        timed = [
+            (pet, task) for pet, task in owner.get_all_tasks() if task.fixed_time is not None
+        ]
+        by_time: dict[time, list[tuple[Pet, Task]]] = {}
+        for pet, task in timed:
+            by_time.setdefault(task.fixed_time, []).append((pet, task))
+
+        for fixed_time, entries in by_time.items():
+            if len(entries) < 2:
+                continue
+            names = ", ".join(f"{pet.name}: {task.title}" for pet, task in entries)
+            warnings.append(
+                f"Conflict at {fixed_time.strftime('%H:%M')} — {names}"
+            )
+        return warnings

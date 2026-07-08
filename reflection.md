@@ -40,8 +40,9 @@ No structural classes changed yet — these are refinements I'll make when I mov
 
 **b. Tradeoffs**
 
-- Describe one tradeoff your scheduler makes.
-- Why is that tradeoff reasonable for this scenario?
+`Scheduler.detect_conflicts()` only flags tasks that share the *exact same* `fixed_time` (e.g. two tasks both at 08:00), rather than checking whether their durations actually overlap (e.g. an 08:00-08:30 walk and an 08:15 feeding). Exact-match comparison is a simple dictionary keyed by `time`, so it's O(n) and easy to reason about, whereas true overlap detection means comparing every pair of time ranges (or sorting and sweeping), which is more code and more ways to get the edge cases wrong (adjacent-but-not-overlapping, one task fully containing another, etc.).
+
+This tradeoff is reasonable for a small pet-care scheduler: task counts per pet per day are tiny, and most real conflicts a pet owner would hit ("I told the dog walker 8am and also blocked the vet for 8am") are exact clashes anyway. The known gap is documented here so it can be revisited if the app grows into finer-grained, minute-level overlap checking.
 
 ---
 

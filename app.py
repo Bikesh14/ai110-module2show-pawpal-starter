@@ -116,6 +116,11 @@ available_minutes = st.number_input(
 
 if st.button("Generate schedule"):
     scheduler = Scheduler()
+
+    conflicts = scheduler.detect_conflicts(owner)
+    for warning in conflicts:
+        st.warning(f"⚠️ {warning}")
+
     plan = scheduler.build_plan(owner, available_minutes=int(available_minutes))
 
     if not plan:
