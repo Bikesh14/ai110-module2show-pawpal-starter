@@ -22,11 +22,14 @@ classDiagram
         +time fixed_time
         +bool is_recurring
         +str recurrence
+        +bool completed
+        +mark_complete() None
+        +mark_incomplete() None
     }
 
     class Scheduler {
-        +int available_minutes
-        +build_plan(pet, available_minutes) list~ScheduledItem~
+        +time day_start
+        +build_plan(owner, available_minutes) list~ScheduledItem~
         +explain(plan) str
     }
 
@@ -39,5 +42,5 @@ classDiagram
 
     Owner "1" --> "many" Pet : owns
     Pet "1" --> "many" Task : has
-    Scheduler --> Pet : schedules for
+    Scheduler --> Owner : retrieves tasks from
     Scheduler --> ScheduledItem : produces

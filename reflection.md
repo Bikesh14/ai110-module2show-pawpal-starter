@@ -10,13 +10,24 @@
 
 **a. Initial design**
 
-- Briefly describe your initial UML design.
-- What classes did you include, and what responsibilities did you assign to each?
+My initial UML has five classes:
+
+- **Owner** — holds the owner's name and preferences, and owns a list of `Pet`s.
+- **Pet** — holds name, species, and a list of `Task`s; responsible for adding/removing its own tasks.
+- **Task** — a data-only class describing one piece of care (title, duration, priority, category, optional fixed time, and recurrence info).
+- **Scheduler** — takes a `Pet` and an available-time budget, and is responsible for building an ordered daily plan (`build_plan`) and explaining its choices (`explain`).
+- **ScheduledItem** — the output of scheduling: a `Task` paired with a concrete start/end time and a reason string.
+
+I split `Task` (raw data) from `ScheduledItem` (task + computed time slot + reasoning) so the scheduler doesn't have to mutate `Task` objects — it just produces a new list of `ScheduledItem`s, keeping the pet's task list as the source of truth.
 
 **b. Design changes**
 
-- Did your design change during implementation?
-- If yes, describe at least one change and why you made it.
+While reviewing the skeleton with AI assistance, two potential issues surfaced before any logic was written:
+
+1. There's currently no way to mark a task as "done" for the day, so a recurring task could get rescheduled repeatedly even after completion. I plan to add a `completed_today` flag (or a separate completion log) once I implement scheduling logic.
+2. `available_minutes` exists both as a `Scheduler` field and as a parameter to `build_plan`, which is redundant. I'll likely drop the field and only take it as a parameter, since the available time can change per day/run.
+
+No structural classes changed yet — these are refinements I'll make when I move from skeleton to actual logic.
 
 ---
 
