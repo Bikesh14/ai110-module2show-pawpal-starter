@@ -2,6 +2,12 @@
 
 ## 1. System Design
 
+**Core user actions**
+
+- Add a pet (and its owner's basic info/preferences) to the system.
+- Add or edit a care task for a pet (title, duration, priority, and optionally a fixed time or recurrence).
+- Generate today's schedule/plan, which picks and orders tasks based on available time and priority, and explains why each task was placed where it was.
+
 **a. Initial design**
 
 - Briefly describe your initial UML design.
