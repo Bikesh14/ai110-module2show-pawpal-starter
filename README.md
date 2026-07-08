@@ -114,7 +114,7 @@ Full CLI output — including priority sorting, per-pet filtering, next-availabl
 ```
 ============================= test session starts ==============================
 platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
-rootdir: /Users/bbimali1/Desktop/Codepath_projects/ai110-module2show-pawpal-starter
+rootdir: /Users/....../ai110-module2show-pawpal-starter
 collected 21 items
 
 tests/test_pawpal.py .....................                               [100%]
@@ -135,4 +135,8 @@ tests/test_pawpal.py .....................                               [100%]
 5. Set available minutes (e.g. 90) and click "Generate schedule" — fixed-time tasks go first, then the rest ordered by priority, each with a one-line reason.
 6. Mark "Morning feeding" complete — its next occurrence is created automatically, due the next day.
 
-*Screenshot or video (optional): not included — the walkthrough and CLI output above are the demo evidence.*
+**Screenshots:**
+
+| Owner & pets, save/load | Task list with filters | Conflict warning, next slot, and build schedule |
+|---|---|---|
+| ![Owner and pets panel with Save/Load buttons](image/README/1783480521937.png) | ![Task table with filter-by-pet and filter-by-status controls](image/README/1783480595212.png) | ![Scheduling conflict warning above the next-available-slot and build-schedule controls](image/README/1783480605211.png) |
